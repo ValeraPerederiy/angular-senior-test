@@ -15,7 +15,7 @@ export interface FormUrlSyncConfig {
   debounceMs?: number;
 }
 
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class UrlFormSyncService {
   private readonly router = inject(Router);
   private readonly location = inject(Location);
@@ -26,61 +26,68 @@ export class UrlFormSyncService {
   syncTwoWayWithSignals(config: FormUrlSyncConfig): void {
     const { formGroup, controlSchema, defaults = {}, excludeKeysFn, debounceMs = 200 } = config;
 
-    const currentParams = this.router.routerState.snapshot.root.queryParams;
-    const formSnapshot = this.paramsToFormSnapshot(currentParams, controlSchema, defaults);
-    
+    let latestParams = this.router.routerState.snapshot.root.queryParams;
+
+    const formSnapshot = this.paramsToFormSnapshot(latestParams, controlSchema, defaults);
     if (Object.keys(formSnapshot).length > 0) {
       this.suppressUrlWrite = true;
       formGroup.patchValue(formSnapshot, { emitEvent: false });
       this.suppressUrlWrite = false;
     }
 
-    formGroup.valueChanges.pipe(
-      startWith(formGroup.getRawValue()),
-      debounceTime(debounceMs),
-      distinctUntilChanged((prev, curr) => this.deepEqual(prev, curr)),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((formValue) => {
-      if (this.suppressUrlWrite) return;
+    formGroup.valueChanges
+      .pipe(
+        startWith(formGroup.getRawValue()),
+        debounceTime(debounceMs),
+        distinctUntilChanged((prev, curr) => this.deepEqual(prev, curr)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((formValue) => {
+        if (this.suppressUrlWrite) return;
 
-      const newParams = this.formToParams(formValue, controlSchema, excludeKeysFn);
-      const cleanedParams = this.cleanParams(newParams);
-      
-      if (!this.deepEqual(currentParams, cleanedParams)) {
-        this.updateQueryParams(cleanedParams);
-      }
-    });
+        const newParams = this.formToParams(formValue, controlSchema, excludeKeysFn);
+        const cleanedParams = this.cleanParams(newParams);
 
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(() => {
-      if (this.suppressFormPatch) return;
+        latestParams = this.router.routerState.snapshot.root.queryParams;
 
-      const queryParams = this.router.routerState.snapshot.root.queryParams;
-      const formSnapshot = this.paramsToFormSnapshot(queryParams, controlSchema, defaults);
-      
-      this.suppressUrlWrite = true;
-      formGroup.patchValue(formSnapshot, { emitEvent: false });
-      this.suppressUrlWrite = false;
-    });
+        if (!this.deepEqual(latestParams, cleanedParams)) {
+          this.updateQueryParams(cleanedParams);
+          latestParams = cleanedParams;
+        }
+      });
+
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        if (this.suppressFormPatch) return;
+        latestParams = this.router.routerState.snapshot.root.queryParams;
+        const nextSnapshot = this.paramsToFormSnapshot(latestParams, controlSchema, defaults);
+        this.suppressUrlWrite = true;
+        formGroup.patchValue(nextSnapshot, { emitEvent: false });
+        this.suppressUrlWrite = false;
+      });
   }
 
   updateQueryParams(cleaned: Params): void {
     try {
       const tree = this.router.createUrlTree([], {
+        relativeTo: this.router.routerState.root,
         queryParams: cleaned,
-        queryParamsHandling: ''
+        queryParamsHandling: '',
       });
 
-      const url = this.router.serializeUrl(tree);
+      let url = this.router.serializeUrl(tree);
+      if (!url || url === '#') url = this.router.url;
 
       this.location.replaceState(url);
-    } catch (error) {
+    } catch {
       this.router.navigate([], {
         queryParams: cleaned,
-        queryParamsHandling: 'merge',
-        replaceUrl: true
+        queryParamsHandling: '',
+        replaceUrl: true,
       });
     }
   }
@@ -88,13 +95,13 @@ export class UrlFormSyncService {
   private paramsToFormSnapshot(
     params: Record<string, any>,
     schema: ControlSchema,
-    defaults: Record<string, any>
+    defaults: Record<string, any>,
   ): Record<string, any> {
     const snapshot: Record<string, any> = {};
 
     for (const [key, type] of Object.entries(schema)) {
       const paramValue = params[key];
-      
+
       if (paramValue !== undefined && paramValue !== null && paramValue !== '') {
         snapshot[key] = this.deserializeValue(paramValue, type);
       } else if (defaults[key] !== undefined) {
@@ -110,14 +117,14 @@ export class UrlFormSyncService {
   private formToParams(
     formValue: Record<string, any>,
     schema: ControlSchema,
-    excludeKeysFn?: (snapshot: Record<string, any>) => string[]
+    excludeKeysFn?: (snapshot: Record<string, any>) => string[],
   ): Record<string, any> {
     const params: Record<string, any> = {};
     const excludeKeys = excludeKeysFn ? excludeKeysFn(formValue) : [];
 
     for (const [key, type] of Object.entries(schema)) {
       if (excludeKeys.includes(key)) continue;
-      
+
       const value = formValue[key];
       if (value !== undefined && value !== null) {
         const serialized = this.serializeValue(value, type);
@@ -144,7 +151,7 @@ export class UrlFormSyncService {
         if (typeof value === 'object' && value.from && value.to) {
           const from = value.from instanceof Date ? value.from : new Date(value.from);
           const to = value.to instanceof Date ? value.to : new Date(value.to);
-          
+
           if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
             return `${from.toISOString().slice(0, 10)}..${to.toISOString().slice(0, 10)}`;
           }
@@ -183,7 +190,7 @@ export class UrlFormSyncService {
           const [fromStr, toStr] = paramValue.split('..');
           const from = new Date(fromStr);
           const to = new Date(toStr);
-          
+
           if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
             return { from, to };
           }
@@ -192,9 +199,10 @@ export class UrlFormSyncService {
 
       case 'array':
         if (paramValue.includes(',')) {
-          return paramValue.split(',')
-            .map(item => item.trim())
-            .filter(item => item.length > 0)
+          return paramValue
+            .split(',')
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
             .sort();
         }
         return [paramValue];
@@ -219,13 +227,13 @@ export class UrlFormSyncService {
 
   private cleanParams(params: Record<string, any>): Record<string, any> {
     const cleaned: Record<string, any> = {};
-    
+
     for (const [key, value] of Object.entries(params)) {
       if (this.isValidParamValue(value)) {
         cleaned[key] = value;
       }
     }
-    
+
     return cleaned;
   }
 
@@ -233,29 +241,29 @@ export class UrlFormSyncService {
     if (value === null || value === undefined || value === '') {
       return false;
     }
-    
+
     if (Array.isArray(value)) {
       return value.length > 0;
     }
-    
+
     if (typeof value === 'object' && value !== null) {
       return Object.keys(value).length > 0;
     }
-    
+
     return true;
   }
 
   private deepEqual(obj1: any, obj2: any): boolean {
     if (obj1 === obj2) return true;
-    
+
     if (obj1 == null || obj2 == null) return obj1 === obj2;
-    
+
     if (typeof obj1 !== typeof obj2) return false;
-    
+
     if (typeof obj1 !== 'object') return obj1 === obj2;
-    
+
     if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
-    
+
     if (Array.isArray(obj1)) {
       if (obj1.length !== obj2.length) return false;
       for (let i = 0; i < obj1.length; i++) {
@@ -263,17 +271,17 @@ export class UrlFormSyncService {
       }
       return true;
     }
-    
+
     const keys1 = Object.keys(obj1);
     const keys2 = Object.keys(obj2);
-    
+
     if (keys1.length !== keys2.length) return false;
-    
+
     for (const key of keys1) {
       if (!keys2.includes(key)) return false;
       if (!this.deepEqual(obj1[key], obj2[key])) return false;
     }
-    
+
     return true;
   }
 }

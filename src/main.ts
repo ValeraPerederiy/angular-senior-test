@@ -5,16 +5,13 @@ import { provideRouter, withHashLocation } from '@angular/router';
 
 import { AppComponent } from './app/app.component';
 import { APP_ROUTES } from './app/app.routing';
-import { environment } from '../environments/environment';
 
 const isStackBlitz =
   location.hostname.endsWith('.webcontainer.io') ||
   location.hostname.includes('stackblitz') ||
   (navigator.userAgent || '').toLowerCase().includes('webcontainer');
 
-const useHashLocation = isStackBlitz || environment.useHashLocation;
-
-const routerProviders = useHashLocation ? provideRouter(APP_ROUTES, withHashLocation()) : provideRouter(APP_ROUTES);
+const routerProviders = isStackBlitz ? provideRouter(APP_ROUTES, withHashLocation()) : provideRouter(APP_ROUTES);
 
 bootstrapApplication(AppComponent, {
   providers: [
