@@ -1,7 +1,8 @@
 import { Injectable, inject, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormGroup } from '@angular/forms';
-import { Router, NavigationEnd } from '@angular/router';
+import { Router, NavigationEnd, ActivatedRoute, Params } from '@angular/router';
+import { Location } from '@angular/common';
 import { filter, debounceTime, startWith, distinctUntilChanged } from 'rxjs/operators';
 
 export type ControlSchema = Record<string, 'scalar' | 'dateRange' | 'array'>;
@@ -17,6 +18,7 @@ export interface FormUrlSyncConfig {
 @Injectable()
 export class UrlFormSyncService {
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
   private readonly destroyRef = inject(DestroyRef);
   private suppressUrlWrite = false;
   private suppressFormPatch = false;
@@ -45,11 +47,7 @@ export class UrlFormSyncService {
       const cleanedParams = this.cleanParams(newParams);
       
       if (!this.deepEqual(currentParams, cleanedParams)) {
-        this.router.navigate([], {
-          queryParams: cleanedParams,
-          queryParamsHandling: 'merge',
-          replaceUrl: true
-        });
+        this.updateQueryParams(cleanedParams);
       }
     });
 
@@ -66,6 +64,25 @@ export class UrlFormSyncService {
       formGroup.patchValue(formSnapshot, { emitEvent: false });
       this.suppressUrlWrite = false;
     });
+  }
+
+  updateQueryParams(cleaned: Params): void {
+    try {
+      const tree = this.router.createUrlTree([], {
+        queryParams: cleaned,
+        queryParamsHandling: ''
+      });
+
+      const url = this.router.serializeUrl(tree);
+
+      this.location.replaceState(url);
+    } catch (error) {
+      this.router.navigate([], {
+        queryParams: cleaned,
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
   }
 
   private paramsToFormSnapshot(
@@ -204,15 +221,28 @@ export class UrlFormSyncService {
     const cleaned: Record<string, any> = {};
     
     for (const [key, value] of Object.entries(params)) {
-      if (value !== null && value !== undefined && value !== '') {
-        if (Array.isArray(value) && value.length === 0) {
-          continue;
-        }
+      if (this.isValidParamValue(value)) {
         cleaned[key] = value;
       }
     }
     
     return cleaned;
+  }
+
+  private isValidParamValue(value: any): boolean {
+    if (value === null || value === undefined || value === '') {
+      return false;
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    
+    if (typeof value === 'object' && value !== null) {
+      return Object.keys(value).length > 0;
+    }
+    
+    return true;
   }
 
   private deepEqual(obj1: any, obj2: any): boolean {

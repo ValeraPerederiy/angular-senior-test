@@ -3,8 +3,10 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --host 0.0.0.0 --port 4200",
-    "build": "ng build"
+    "start": "ng serve",
+    "start:stackblitz": "ng serve --configuration=stackblitz",
+    "build": "ng build",
+    "build:stackblitz": "ng build --configuration=stackblitz"
   },
   "dependencies": {
     "@angular/animations": "^20.0.0",
@@ -15,7 +17,6 @@
     "@angular/forms": "^20.0.0",
     "@angular/material": "^20.2.2",
     "@angular/platform-browser": "^20.0.0",
-    "@angular/platform-browser-dynamic": "^20.0.0",
     "@angular/router": "^20.0.0",
     "rxjs": "^7.8.1",
     "tslib": "^2.5.0",
