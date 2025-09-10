@@ -1,43 +1,20 @@
 <div class="stats">
-  <form class="ui-filters" [formGroup]="filterFormGroup">
-    <mat-form-field>
-      <mat-label>З - ПО</mat-label>
-      <mat-date-range-input
-        [rangePicker]="rangePicker"
-        [comparisonStart]="filterFormGroup.value.compareDateFrom"
-        [comparisonEnd]="filterFormGroup.value.compareDateTo"
-      >
-        <input formControlName="dateFrom" matStartDate required />
-        <input formControlName="dateTo" matEndDate required />
-      </mat-date-range-input>
-      <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
-      <mat-date-range-picker #rangePicker>
-        <mat-date-range-picker-actions>
-          <button mat-button matDateRangePickerCancel>Скасувати</button>
-          <button mat-raised-button color="primary" matDateRangePickerApply>Застосувати</button>
-        </mat-date-range-picker-actions>
-      </mat-date-range-picker>
-    </mat-form-field>
+  <form class="ui-filters" 
+        [formGroup]="filterFormGroup"
+        formUrlSync
+        [controlSchema]="controlSchema"
+        [defaults]="defaults()"
+        [excludeKeysFn]="excludeKeysFn">
+    <app-date-range-picker 
+      formControlName="periodRange" 
+      label="З - ПО">
+    </app-date-range-picker>
 
     @if (isCompareMode()) {
-    <mat-form-field>
-      <mat-label>З - ПО</mat-label>
-      <mat-date-range-input
-        [rangePicker]="compareRangePicker"
-        [comparisonStart]="filterFormGroup.value.dateFrom"
-        [comparisonEnd]="filterFormGroup.value.dateTo"
-      >
-        <input formControlName="compareDateFrom" matStartDate required />
-        <input formControlName="compareDateTo" matEndDate required />
-      </mat-date-range-input>
-      <mat-datepicker-toggle matSuffix [for]="compareRangePicker"></mat-datepicker-toggle>
-      <mat-date-range-picker #compareRangePicker>
-        <mat-date-range-picker-actions>
-          <button mat-button matDateRangePickerCancel>Скасувати</button>
-          <button mat-raised-button color="primary" matDateRangePickerApply>Застосувати</button>
-        </mat-date-range-picker-actions>
-      </mat-date-range-picker>
-    </mat-form-field>
+    <app-date-range-picker 
+      formControlName="comparePeriodRange" 
+      label="Порівняння З - ПО">
+    </app-date-range-picker>
     }
 
     <mat-button-toggle-group uiSingle>

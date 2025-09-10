@@ -1,34 +1,25 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
-import {
-  MatDatepickerActions,
-  MatDatepickerApply,
-  MatDatepickerCancel,
-  MatDatepickerToggle,
-  MatDateRangeInput,
-  MatDateRangePicker,
-  MatEndDate,
-  MatStartDate,
-} from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatFormField, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { delay, Observable, of } from 'rxjs';
 
 import { FilteredAbstractComponent } from '../../../shared/components/filtered-abstract.component';
+import { DateRangePickerComponent } from '../../../shared/components/date-range-picker.component';
 import { UiToggleGroupSingleDirective } from '../../../shared/directives/ui-toggle-group-single.directive';
 
+import { ControlSchema } from '../../../shared/services/url-form-sync.service';
+
 import { ControlsOf } from '../../../shared/models/controls-of';
+import { FormUrlSyncDirective } from '../../../shared/directives/form-url-sync.directive';
 
 export type StatsModel = {};
 
 export type StatsFiltersModel = Partial<{
-  dateFrom: Date;
-  dateTo: Date;
-  compareDateFrom: Date;
-  compareDateTo: Date;
+  periodRange: { from: Date | null; to: Date | null };
+  comparePeriodRange: { from: Date | null; to: Date | null };
 }>;
 
 @Component({
@@ -38,23 +29,12 @@ export type StatsFiltersModel = Partial<{
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    MatFormField,
-    MatLabel,
-    MatDateRangeInput,
-    MatStartDate,
-    MatEndDate,
-    MatDatepickerToggle,
-    MatSuffix,
-    MatDateRangePicker,
-    MatDatepickerActions,
-    MatButton,
-    MatDatepickerCancel,
-    MatDatepickerApply,
     MatButtonToggleGroup,
     MatButtonToggle,
-    MatNativeDateModule,
     MatProgressBarModule,
+    DateRangePickerComponent,
     UiToggleGroupSingleDirective,
+    FormUrlSyncDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -63,32 +43,43 @@ export class StatsComponent extends FilteredAbstractComponent<StatsModel[], Stat
 
   private readonly fb = inject(FormBuilder);
 
-  protected createFilters(): FormGroup<ControlsOf<StatsFiltersModel>> {
-    // дефолтні значення для фільтрів
+  protected readonly controlSchema: ControlSchema = {
+    periodRange: 'dateRange',
+    comparePeriodRange: 'dateRange'
+  };
+
+  protected readonly defaults = computed(() => {
     const today = new Date();
+    return {
+      periodRange: {
+        from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 14),
+        to: today
+      }
+    };
+  });
+
+  protected readonly excludeKeysFn = (snapshot: Record<string, any>) => {
+    return this.isCompareMode() ? [] : ['comparePeriodRange'];
+  };
+
+  protected createFilters(): FormGroup<ControlsOf<StatsFiltersModel>> {
     return this.fb.group<ControlsOf<StatsFiltersModel>>({
-      dateFrom: this.fb.control<Date>(
-        new Date(today.getFullYear(), today.getMonth(), today.getDate() - 14),
-        Validators.required,
-      ),
-      dateTo: this.fb.control<Date>(today, Validators.required),
-      compareDateFrom: this.fb.control<Date>({ value: null, disabled: true }, Validators.required),
-      compareDateTo: this.fb.control<Date>({ value: null, disabled: true }, Validators.required),
+      periodRange: this.fb.control<{ from: Date | null; to: Date | null }>({ from: null, to: null }, Validators.required),
+      comparePeriodRange: this.fb.control<{ from: Date | null; to: Date | null }>({ from: null, to: null }),
     });
   }
 
   protected toggleCompare(): void {
-    if (this.filterFormGroup.get('compareDateFrom').enabled) {
-      this.filterFormGroup.get('compareDateFrom').reset(null, { emitEvent: false });
-      this.filterFormGroup.get('compareDateTo').reset(null, { emitEvent: false });
-      this.filterFormGroup.get('compareDateFrom').disable({ emitEvent: false });
-      this.filterFormGroup.get('compareDateTo').disable();
+    const compareControl = this.filterFormGroup.get('comparePeriodRange');
+    
+    if (compareControl?.enabled) {
+      compareControl.reset({ from: null, to: null }, { emitEvent: false });
+      compareControl.disable({ emitEvent: false });
     } else {
-      this.filterFormGroup.get('compareDateFrom').enable({ emitEvent: false });
-      this.filterFormGroup.get('compareDateTo').enable();
+      compareControl?.enable({ emitEvent: false });
     }
 
-    this.isCompareMode.set(this.filterFormGroup.get('compareDateFrom').enabled);
+    this.isCompareMode.set(compareControl?.enabled ?? false);
   }
 
   protected loadData(): Observable<StatsModel[]> {

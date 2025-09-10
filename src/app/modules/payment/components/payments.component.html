@@ -1,5 +1,8 @@
 <div class="payments">
-  <form class="ui-filters" [formGroup]="filterFormGroup">
+  <form class="ui-filters" 
+        [formGroup]="filterFormGroup"
+        formUrlSync
+        [controlSchema]="controlSchema">
     <mat-form-field>
       <mat-label>Account Id</mat-label>
       <input matInput type="number" formControlName="accountId" min="0" />
@@ -10,25 +13,14 @@
       <input matInput type="number" formControlName="userId" min="0" />
     </mat-form-field>
 
-    <mat-form-field>
-      <mat-label>Дата</mat-label>
-      <mat-date-range-input [rangePicker]="rangePicker">
-        <input formControlName="startDate" matStartDate placeholder="З" />
-        <input formControlName="endDate" matEndDate placeholder="По" />
-      </mat-date-range-input>
-      <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
-      <mat-date-range-picker #rangePicker>
-        <mat-date-range-picker-actions>
-          <button mat-button matDateRangePickerCancel>Скасувати</button>
-          <button mat-raised-button color="primary" matDateRangePickerApply>Застосувати</button>
-        </mat-date-range-picker-actions>
-      </mat-date-range-picker>
-    </mat-form-field>
+    <app-date-range-picker formControlName="dateRange"></app-date-range-picker>
 
     <mat-form-field>
       <mat-label>Тип платежу</mat-label>
+
       <mat-select formControlName="type">
         <mat-option [value]="null">Всі</mat-option>
+        
         @for (item of ['ep', 'epu', 'esv']; track item) {
         <mat-option [value]="item">{{ item }}</mat-option>
         }

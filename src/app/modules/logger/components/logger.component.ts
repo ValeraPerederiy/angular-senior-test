@@ -4,24 +4,16 @@ import { MatBadge } from '@angular/material/badge';
 import { MatButton } from '@angular/material/button';
 import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import {
-  MatDatepickerActions,
-  MatDatepickerApply,
-  MatDatepickerCancel,
-  MatDatepickerToggle,
-  MatDateRangeInput,
-  MatDateRangePicker,
-  MatEndDate,
-  MatStartDate,
-} from '@angular/material/datepicker';
 import { MatFormField, MatLabel, MatSuffix } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { MatNativeDateModule } from '@angular/material/core';
 import { Observable, of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 
 import { FilteredAbstractComponent } from '../../../shared/components/filtered-abstract.component';
+import { DateRangePickerComponent } from '../../../shared/components/date-range-picker.component';
 import { UiToggleGroupSingleDirective } from '../../../shared/directives/ui-toggle-group-single.directive';
+import { FormUrlSyncDirective } from '../../../shared/directives/form-url-sync.directive';
+import { ControlSchema } from '../../../shared/services/url-form-sync.service';
 
 import { ControlsOf } from '../../../shared/models/controls-of';
 
@@ -35,8 +27,7 @@ export type LoggerModel = {
 
 export type LoggerFiltersModel = Partial<
   Omit<LoggerModel, 'datetime'> & {
-    createdDateFrom: Date;
-    createdDateTo: Date;
+    createdDateRange: { from: Date | null; to: Date | null };
   }
 >;
 
@@ -50,22 +41,13 @@ export type LoggerFiltersModel = Partial<
     MatFormField,
     MatLabel,
     MatInput,
-    MatSuffix,
-    MatDateRangeInput,
-    MatStartDate,
-    MatEndDate,
-    MatDatepickerToggle,
-    MatDateRangePicker,
-    MatDatepickerActions,
-    MatButton,
-    MatDatepickerCancel,
-    MatDatepickerApply,
     MatBadge,
     MatButtonToggleGroup,
     MatButtonToggle,
-    MatNativeDateModule,
     MatProgressBarModule,
+    DateRangePickerComponent,
     UiToggleGroupSingleDirective,
+    FormUrlSyncDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -74,14 +56,21 @@ export class LoggerComponent extends FilteredAbstractComponent<LoggerModel[], Lo
 
   private readonly fb = inject(FormBuilder);
 
+  protected readonly controlSchema: ControlSchema = {
+    accountId: 'scalar',
+    needToFix: 'scalar',
+    level: 'array',
+    title: 'scalar',
+    createdDateRange: 'dateRange'
+  };
+
   protected createFilters(): FormGroup<ControlsOf<LoggerFiltersModel>> {
     return this.fb.group<ControlsOf<LoggerFiltersModel>>({
       accountId: this.fb.control<number>(null),
       needToFix: this.fb.control<boolean>(null),
       level: this.fb.control<string[]>(null),
       title: this.fb.control<string>(null),
-      createdDateFrom: this.fb.control<Date>(null),
-      createdDateTo: this.fb.control<Date>(null),
+      createdDateRange: this.fb.control<{ from: Date | null; to: Date | null }>({ from: null, to: null }),
     });
   }
 
