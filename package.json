@@ -2,11 +2,9 @@
   "name": "angular-starter",
   "private": true,
   "scripts": {
-    "ng": "ng",
-    "start": "ng serve",
-    "start:stackblitz": "ng serve --configuration=stackblitz",
-    "build": "ng build",
-    "build:stackblitz": "ng build --configuration=stackblitz"
+    "start": "ng serve --configuration stackblitz",
+    "start:dev": "ng serve",
+    "build": "ng build"
   },
   "dependencies": {
     "@angular/animations": "^20.0.0",
